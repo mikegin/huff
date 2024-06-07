@@ -1,0 +1,27 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug huff",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/huff",
+            "cwd": "${workspaceFolder}",
+            "args": ["test2.txt"],
+            "stopAtEntry": false,
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "build huff",
+            "miDebuggerPath": "/usr/bin/gdb"
+        }
+        
+    ]
+}
