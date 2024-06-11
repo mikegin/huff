@@ -1,31 +1,70 @@
 #include <stdio.h>
 #include <assert.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+#include "heap.cpp"
 
-typedef struct Node_ {
-    char ch;
-    int weight;
-    struct Node_ * left;
-    struct Node_ * right;
-} Node;
+typedef uint32_t u32;
 
-void printTree(Node_ * root, int depth)
+void printCode(HeapNode * node)
+{
+    u32 code = node->code;
+    for (int i = node->codeLength - 1; i >= 0; i--)
+    {
+        if (((code >> i) & 1) == 1)
+        {
+            fprintf(stdout, "1");
+        }
+        else
+        {
+            fprintf(stdout, "0");
+        }
+    }
+}
+
+void labelCodes(HeapNode * root, u32 depth, u32 code)
+{
+    if(root != NULL)
+    {
+        fprintf(stdout, "ch = %c freq = %d code = ", root->ch, root->freq);
+        root->code = code;
+        root->codeLength = depth + 1;
+        printCode(root);
+        fprintf(stdout, "\n");
+        if(root->left)
+        {
+            labelCodes(root->left, depth + 1, (code << 1) | 0);
+        }
+        if(root->right)
+        {
+            labelCodes(root->right, depth + 1, (code << 1) | 1);
+        }
+    }
+}
+
+void verifyHeap(HeapNode * root)
 {
     if (root != NULL)
     {
-        if ((*root).left != NULL)
+        
+        if (root->left && root->right)
         {
-            printTree((*root).left, depth + 1);
+            assert(root->freq == root->left->freq + root->right->freq);
+            
         }
-        for (int i = 0; i < depth; i++)
+        else if (!root->left && !root->right)
         {
-            fprintf(stdout, " ");
+            fprintf(stdout, "ch = %c freq = %d code = ");
+            printCode(root);
+            fprintf(stdout, "\n");
         }
-        fprintf(stdout, "Depth: %d, Node: ch = %c, weight = %d\n", depth, (*root).ch, (*root).weight);
-        if ((*root).right != NULL)
+        else
         {
-            printTree((*root).right, depth + 1);
+            assert(false); // should not have just 1 child;
         }
+        verifyHeap(root->left);
+        verifyHeap(root->right);
     }
 }
 
@@ -33,115 +72,155 @@ int main(int argc, char ** args)
 {
     if (argc > 1)
     {
-        char * filename = args[1];
+        int decode = 0;
+        char * filename;
+
+        if (argc > 2)
+        {
+            if (strcmp(args[1], "-d") == 0)
+            {
+                decode = 1;
+                filename = args[2];
+            }
+            else
+            {
+                fprintf(stderr, "Usage: huff [-d] <filename>\n");
+                return -1;    
+            }
+        }
+        else
+        {
+            filename = args[1];
+        }
+        
         FILE * fp = fopen(filename, "r");
+        FILE * fp2 = fp;
+
         
         if (fp != NULL)
         {
-            int len = 4096;
-            char * chs = (char *)calloc(len, sizeof(char));
-            int * occ = (int *)calloc(len, sizeof(int));
 
-            if (chs != NULL && occ != NULL)
+            if (decode)
             {
-                char ch;
-                while ((ch = fgetc(fp)) != EOF) {
-                    // count += 1;
-                    // fprintf(stdout, "ch: %c\n", ch);
-                    for (int i = 0; i < len; ++i)
-                    {
-                        if (chs[i] == '\0')
+
+            }
+            else
+            {
+                int len = 4096;
+                char * chs = (char *)calloc(len, sizeof(char));
+                int * occ = (int *)calloc(len, sizeof(int));
+
+                if (chs != NULL && occ != NULL)
+                {
+                    char ch;
+                    while ((ch = fgetc(fp)) != EOF) {
+                        for (int i = 0; i < len; ++i)
                         {
-                            chs[i] = ch;
-                            occ[i] += 1;
-                            break;
-                        }
-                        else if (chs[i] == ch)
-                        {
-                            occ[i] += 1;
-                            break;
-                        }
-                    }
-                }
-
-                int size = 0;
-                char * t = chs;
-                while(*t++ != '\0')
-                {
-                    size++;
-                }
-
-                fprintf(stdout, "Total number of characters: %d\n", size);
-
-                fprintf(stdout, "Occurences: \n");
-                for (int i = 0; i < len; ++i)
-                {
-                    if (chs[i] == '\0') break;
-                    // if (chs[i] == 't') 
-                    // {
-                    //     fprintf(stdout, "%c: %d\n", chs[i], occ[i]);
-                    //     assert(occ[i] == 223000); // assertions for les-miserable.txt
-                    // }
-                    // if (chs[i] == 'X')
-                    // {
-                    //     fprintf(stdout, "%c: %d", chs[i], occ[i]);
-                    //      assert(occ[i] == 333); // assertions for les-miserable.txt
-                    // }
-                    fprintf(stdout, "%c: %d\n", chs[i], occ[i]);
-                }
-
-                // build huffman tree
-                // TODO: use priority queue
-                Node_ * arr = (Node_ *)calloc(size * 2 - 1, sizeof(Node_)); // there is n - 1 combined nodes, so n + n - 1 = 2n - 1
-                for (int i = 0; i < size; i++)
-                {
-                    arr[i] = Node_ { ch: chs[i], weight: occ[i] };
-                }
-
-
-                // start and end of range of nodes we are looking at
-                int start = 0;
-                int end = size - 1;
-                for(int s = 0; s < size - 1; s ++) // we run the node combining n - 1 times, see visual of tree to confirm
-                {
-                    fprintf(stdout, "start = %d, end = %d, size =%d\n", start, end, size);
-                    // sort the range of nodes we are looking at
-                    for (int i = start; i < end; i++)
-                    {
-                        for (int j = i + 1; j <= end; j++)
-                        {
-                            if (arr[i].weight > arr[j].weight)
+                            if (chs[i] == '\0')
                             {
-                                Node_ temp = arr[i];
-                                arr[i] = arr[j];
-                                arr[j] = temp;
+                                chs[i] = ch;
+                                occ[i] += 1;
+                                break;
+                            }
+                            else if (chs[i] == ch)
+                            {
+                                occ[i] += 1;
+                                break;
                             }
                         }
                     }
 
-                    // pick first (lowest) two and combine                    
-                    Node_ * combined = (Node_ *)malloc(sizeof(Node_));
-                    combined->weight = arr[start].weight + arr[start + 1].weight;
-                    combined->left = &arr[start];
-                    combined->right = &arr[start + 1];
-                    start += 2;
-                    end += 1;
-                    arr[end] = *combined; // put combined at the end of the list
-                    // so for next iteration, we dont look at beginning two (left and right) here and look "ahead" to where new combined node was added
-
-                    for (int i = 0; i <= end; i++)
+                    int size = 0;
+                    char * t = chs;
+                    while(*t++ != '\0')
                     {
-                        fprintf(stdout, "%d: ch = %c weight = %d\n", i, arr[i].ch, arr[i].weight);
+                        size++;
                     }
-                    fprintf(stdout, "-----------\n");
+
+                    // min heap used here as a priority queue for building the huffman tree
+                    Heap * heap = (Heap *)malloc(sizeof(Heap));
+                    heap->capacity = size;
+                    heap->size = 0;
+                    heap->array = (HeapNode **)malloc(heap->capacity * sizeof(HeapNode *));
+                    //have array of leaves to use for later
+                    HeapNode ** leaves = (HeapNode **)malloc(heap->capacity * sizeof(HeapNode *));
+                    
+                    for (int i = 0; i < size; i++)
+                    {
+                        HeapNode * node = (HeapNode *)malloc(sizeof(HeapNode));
+                        node->ch = chs[i];
+                        node->freq = occ[i];
+                        leaves[i] = node;
+                        insertHeap(heap, node);
+                    }
+
+                    // combining always reduces the size of the heap by 1. we exit when we have 1 node in the heap, the root of the huffman tree.
+                    while(heap->size > 1)
+                    {
+                        HeapNode * first = extractMin(heap);
+                        HeapNode * second = extractMin(heap);
+                        HeapNode * combined = (HeapNode *)malloc(sizeof(HeapNode));
+                        combined->freq = first->freq + second->freq;
+                        combined->left = first;
+                        combined->right = second;
+                        insertHeap(heap, combined);
+                    }
+
+                    assert(heap->size == 1);
+                    // verifyHeap(heap->array[0]);
+
+                    HeapNode * huffmanRoot = heap->array[0];
+                    labelCodes(huffmanRoot->left, 0, 0);
+                    labelCodes(huffmanRoot->right, 0, 1);
+                    
+                    FILE * outputFile = fopen("output.bin", "wb");
+                    for (int i = 0; i < size; i++)
+                    {
+                        // fprintf(stdout, "ch = %c freq = %d code = ", leaves[i]->ch, leaves[i]->freq);
+                        // printCode(leaves[i]);
+                        // fprintf(stdout, "\n");
+                        fwrite(&leaves[i]->ch, sizeof(leaves[i]->ch), 1, outputFile);
+                        fwrite(&leaves[i]->code, sizeof(leaves[i]->code), 1, outputFile);
+                    }
+                    
+                    unsigned char buffer = 0;
+                    int bits_in_buffer = 0;
+                    while ((ch = fgetc(fp2)) != EOF) {
+                        for (int i = 0; i < size; i++) // TODO: use a map if size is large
+                        {
+                            if (ch == leaves[i]->ch)
+                            {
+                                //pack code into bytes
+                                for (int c = 0; c < leaves[i]->codeLength; c++)
+                                {
+                                    buffer = (buffer << 1) | ((leaves[i]->code >> c) & 1);
+                                    bits_in_buffer++;
+                                    if (bits_in_buffer == 8)
+                                    {
+                                        fwrite(&buffer, 1, 1, outputFile);
+                                        buffer = 0;
+                                        bits_in_buffer = 0;
+                                    }
+                                }
+                                break; // once matched no need to check other leaves
+                            }
+                        }
+                    }
+
+                    if (bits_in_buffer > 0) {
+                        buffer <<= (8 - bits_in_buffer); // Shift to left since will be reading bits from left to right
+                        fwrite(&buffer, 1, 1, outputFile);
+                        // Write the number of valid bits in the last byte
+                        fwrite(&bits_in_buffer, 1, 1, outputFile);
+                    }
+
                 }
-                Node root = arr[end];
-                printTree(&root, 0);
+                else
+                {
+                    fprintf(stderr, "Memory allocation failed \n");    
+                }
             }
-            else
-            {
-                fprintf(stderr, "Memory allocation failed \n");    
-            }
+                
         }
         else
         {
@@ -150,7 +229,7 @@ int main(int argc, char ** args)
     }
     else
     {
-        fprintf(stderr, "Usage: huff <filename>\n");
+        fprintf(stderr, "Usage: huff [-d] <filename>\n");
     }
 
     return 0;

@@ -7,7 +7,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/huff",
             "cwd": "${workspaceFolder}",
-            "args": ["test2.txt"],
+            "args": ["les-miserable.txt"],
             "stopAtEntry": false,
             "environment": [],
             "externalConsole": false,
