@@ -2,13 +2,14 @@
 #include <stdint.h>
 
 typedef uint32_t u32;
+typedef unsigned char u8;
 
 typedef struct HeapNode {
     char ch;
     u32 freq;
     struct HeapNode *left, *right;
     u32 code;
-    u32 codeLength;
+    u8 codeLength; // how many bits used in code, maximum of 32
 } HeapNode;
 
 typedef struct Heap {
@@ -50,7 +51,7 @@ void insertHeap(Heap * heap, HeapNode * node)
     }
 
     heap->size++;
-    int i = heap->size - 1;
+    u32 i = heap->size - 1;
     heap->array[i] = node;
 
     while(i > 0 && heap->array[(i - 1)/2]->freq > heap->array[i]->freq)
