@@ -6,11 +6,27 @@
 #include "heap.cpp"
 
 typedef uint32_t u32;
+typedef unsigned char u8;
 
 void printCode(HeapNode * node)
 {
     u32 code = node->code;
     for (int i = node->codeLength - 1; i >= 0; i--)
+    {
+        if (((code >> i) & 1) == 1)
+        {
+            fprintf(stdout, "1");
+        }
+        else
+        {
+            fprintf(stdout, "0");
+        }
+    }
+}
+
+void printCode2(u32 code, u32 codeLength)
+{
+    for (int i = codeLength - 1; i >= 0; i--)
     {
         if (((code >> i) & 1) == 1)
         {
@@ -94,31 +110,207 @@ int main(int argc, char ** args)
         }
         
         FILE * fp = fopen(filename, "r");
-        FILE * fp2 = fp;
-
         
         if (fp != NULL)
         {
 
             if (decode)
             {
+                // last byte indicates how many bits used in last byte for actual coding vs padding
+                fseek(fp, -1, SEEK_END);
+                int lastByte = fgetc(fp);
+                long fileSize = ftell(fp);
+                fseek(fp, 0, SEEK_SET);
 
+                // int ch;
+                u32 numOfChars = 0; // 4287954944 for output.bin, 1419051008 if not doing fseek??
+                u32 sizeOfDecoded = 0; // 6817024 for output.bin, 3295453
+                u32 bytesProcessed = 0;
+                // // first 4 bytes is number of characters to 
+                // for (int i = 0; i < 4; i++)
+                // {
+                //     ch = fgetc(fp);
+                //     if (ch == EOF)
+                //     {
+                //         fprintf(stderr, "Error decoding file, incorrect number of bytes needed to specify size of codes table.");
+                //         return -1;
+                //     }
+                //     numOfChars = (numOfChars << 8) | (u8) ch;
+                // }
+                // for (int i = 0; i < 4; i++) {
+                //     ch = fgetc(fp);
+                //     if (ch == EOF) {
+                //         fprintf(stderr, "Error decoding file, incorrect number of bytes needed to specify size of codes table.");
+                //         fclose(fp);
+                //         return -1;
+                //     }
+                //     numOfChars |= ((uint32_t)ch << (8 * i)); // Shift ch left by i*8 bits and combine it
+                // }
+                size_t result = fread(&numOfChars, sizeof(u32), 1, fp);
+                if (result != 1) {
+                    if (feof(fp)) {
+                        printf("Error: Unexpected end of file.\n");
+                    } else if (ferror(fp)) {
+                        perror("Error reading from file");
+                    }
+                    fclose(fp);
+                    return -1;
+                }
+                bytesProcessed += 4;
+
+                result = fread(&sizeOfDecoded, sizeof(u32), 1, fp);
+                if (result != 1) {
+                    if (feof(fp)) {
+                        printf("Error: Unexpected end of file.\n");
+                    } else if (ferror(fp)) {
+                        perror("Error reading from file");
+                    }
+                    fclose(fp);
+                    return -1;
+                }
+                bytesProcessed += 4;
+
+                u8 * chs = (u8 *)malloc(numOfChars * sizeof(u8));
+                u32 * codeLengths = (u32 *)malloc(numOfChars * sizeof(u32));
+                u32 * codes = (u32 *)malloc(numOfChars * sizeof(u32));
+                for (u32 i = 0; i < numOfChars; i++)
+                {
+                    u8 c;
+                    result = fread(&c, sizeof(c), 1, fp);
+                    if (result != 1) {
+                        if (feof(fp)) {
+                            printf("Error: Unexpected end of file.\n");
+                        } else if (ferror(fp)) {
+                            perror("Error reading from file");
+                        }
+                        fclose(fp);
+                        return -1;
+                    }
+                    chs[i] = c;
+
+                    u32 codeLength = 0;
+                    result = fread(&codeLength, sizeof(codeLength), 1, fp);
+                    if (result != 1) {
+                        if (feof(fp)) {
+                            printf("Error: Unexpected end of file.\n");
+                        } else if (ferror(fp)) {
+                            perror("Error reading from file");
+                        }
+                        fclose(fp);
+                        return -1;
+                    }
+                    codeLengths[i] = codeLength;
+
+                    u32 code = 0;
+                    result = fread(&code, sizeof(code), 1, fp);
+                    if (result != 1) {
+                        if (feof(fp)) {
+                            printf("Error: Unexpected end of file.\n");
+                        } else if (ferror(fp)) {
+                            perror("Error reading from file");
+                        }
+                        fclose(fp);
+                        return -1;
+                    }
+                    codes[i] = code;
+                }
+                bytesProcessed += numOfChars * (1 + 4 + 4);
+
+                for (int i = 0; i < numOfChars; i++)
+                {
+                    fprintf(stdout, "ch = %c code = ", chs[i]);
+                    u32 code = codes[i];
+                    u32 codeLength = codeLengths[i];
+                    printCode2(code, codeLength);
+                    if (code == 0)
+                    {
+                        fprintf(stdout, " is zero");
+                    }
+                    fprintf(stdout, "\n");
+                }
+
+                // parse till end of file
+                u8 * decoded = (u8 *)malloc(sizeOfDecoded * sizeof(u8));
+                u32 pos = 0;
+                u32 currentCode = 0;
+                int currentCodeLength = 0;
+                // while ((ch = fgetc(fp)) != EOF)
+                int leftOverBytes = fileSize - bytesProcessed - 1; // last byte used 
+                for (int b = 0; b < leftOverBytes; b++)
+                {
+                    u8 c;
+                    result = fread(&c, sizeof(c), 1, fp);
+                    if (result != 1) {
+                        if (feof(fp)) {
+                            printf("Error: Unexpected end of file.\n");
+                        } else if (ferror(fp)) {
+                            perror("Error reading from file");
+                        }
+                        fclose(fp);
+                        return -1;
+                    }
+
+                    int i = 7;
+
+                    // handle edge case where last coded byte may not have a full code and have padding zeroes
+                    if (b == leftOverBytes - 1) // second last byte
+                    {
+                        i = lastByte - 1;
+                    }
+
+                    for (; i >= 0 ; i--)
+                    {
+                        // int bit = (c >> i) & 1;
+                        u32 bit = ((u32)c >> i) & 1;
+                        currentCode <<= 1;
+                        currentCode |= bit;
+                        currentCodeLength++;
+
+                        fprintf(stdout, "currentCode = ");
+                        printCode2(currentCode, currentCodeLength);
+                        fprintf(stdout, "\n");
+
+                        assert(currentCodeLength <= 32);
+                        // check if currentCode matches a code
+                        for (int n = 0; n < numOfChars; n++)
+                        {
+                            u32 code = codes[n];
+                            u32 codeLength = codeLengths[n];
+                            if (currentCodeLength == codeLength && currentCode == code)
+                            {
+                                char ch_ = chs[n];
+                                decoded[pos] = ch_;
+                                pos++;
+                                fprintf(stdout, "ch = %c pos = %d\n", ch_, pos);
+                                // reset currentCode
+                                currentCode = 0; 
+                                currentCodeLength = 0;
+                            }
+                        }
+                    }
+                }
+                
+                FILE * outputFile = fopen("output2.txt", "w");
+                fwrite(&decoded, 1, pos, outputFile);
             }
             else
             {
                 int len = 4096;
-                char * chs = (char *)calloc(len, sizeof(char));
+                u8 * chs = (u8 *)calloc(len, sizeof(char));
                 int * occ = (int *)calloc(len, sizeof(int));
-
+                u32 sizeOfFile = 0;
                 if (chs != NULL && occ != NULL)
                 {
-                    char ch;
-                    while ((ch = fgetc(fp)) != EOF) {
+                    int ch; // use int to capture all values including EOF
+                    while ((ch = fgetc(fp)) != EOF)
+                    {
+                        sizeOfFile += 1;
+
                         for (int i = 0; i < len; ++i)
                         {
                             if (chs[i] == '\0')
                             {
-                                chs[i] = ch;
+                                chs[i] = (u8) ch;
                                 occ[i] += 1;
                                 break;
                             }
@@ -130,8 +322,8 @@ int main(int argc, char ** args)
                         }
                     }
 
-                    int size = 0;
-                    char * t = chs;
+                    u32 size = 0;
+                    u8 * t = chs;
                     while(*t++ != '\0')
                     {
                         size++;
@@ -174,18 +366,22 @@ int main(int argc, char ** args)
                     labelCodes(huffmanRoot->right, 0, 1);
                     
                     FILE * outputFile = fopen("output.bin", "wb");
+                    fwrite(&size, sizeof(size), 1, outputFile); // write out number of characters so when decoding, know how many codes to parse
+                    fwrite(&sizeOfFile, sizeof(sizeOfFile), 1, outputFile); // write out size of file so we can know size of what output should be when decoding
                     for (int i = 0; i < size; i++)
                     {
                         // fprintf(stdout, "ch = %c freq = %d code = ", leaves[i]->ch, leaves[i]->freq);
                         // printCode(leaves[i]);
                         // fprintf(stdout, "\n");
                         fwrite(&leaves[i]->ch, sizeof(leaves[i]->ch), 1, outputFile);
+                        fwrite(&leaves[i]->codeLength, sizeof(leaves[i]->codeLength), 1, outputFile);
                         fwrite(&leaves[i]->code, sizeof(leaves[i]->code), 1, outputFile);
                     }
-                    
-                    unsigned char buffer = 0;
-                    int bits_in_buffer = 0;
-                    while ((ch = fgetc(fp2)) != EOF) {
+
+                    fseek(fp, 0, SEEK_SET);
+                    u8 buffer = 0;
+                    u8 bits_in_buffer = 0;
+                    while ((ch = fgetc(fp)) != EOF) {
                         for (int i = 0; i < size; i++) // TODO: use a map if size is large
                         {
                             if (ch == leaves[i]->ch)
