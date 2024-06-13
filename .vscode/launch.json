@@ -8,6 +8,7 @@
             "program": "${workspaceFolder}/huff",
             "cwd": "${workspaceFolder}",
             "args": ["les-miserable.txt"],
+            // "args": ["-d", "output.bin"],
             "stopAtEntry": false,
             "environment": [],
             "externalConsole": false,
