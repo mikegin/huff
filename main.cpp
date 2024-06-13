@@ -179,7 +179,7 @@ int main(int argc, char ** args)
                     memcpy(&code, file + byteOffset + 1 + 1, 4);
                     codes[i] = code;
 
-                    fprintf(stdout, "ch = %c code = ", c);
+                    fprintf(stdout, "ch = %c codeLength = %d code = ", c, codeLength);
                     printCode2(code, codeLength);
                     fprintf(stdout, "\n");
                 }
@@ -188,39 +188,39 @@ int main(int argc, char ** args)
                 // Decode the remaining bytes
                 u8 *decoded = (u8 *)malloc(sizeOfDecoded * sizeof(u8));
                 u32 pos = 0;
-                u8 currentCode = 0;
-                int currentCodeLength = 0;
+                u32 currentCode = 0;
+                u8 currentCodeLength = 0;
+
+                offset = bytesProcessed;
 
                 // Calculate remaining bytes to process, account for last byte (padding information)
-                int leftOverBytes = fileSize - bytesProcessed - 1;
-                for (int b = 0; b < leftOverBytes; b++) {
+                long leftOverBytes = fileSize - bytesProcessed - 1;
+                for (long b = 0; b < leftOverBytes; b++) {
                     u8 c;
-                    if (fread(&c, sizeof(c), 1, fp) != 1) {
-                        perror("Error reading encoded data");
-                        fclose(fp);
-                        return EXIT_FAILURE;
-                    }
+                    memcpy(&c, file + offset + b, 1);
+
                     // Handle edge case for last coded byte that may contain padding
                     int bitsToProcess = 8;
                     if (b == leftOverBytes - 1) {
-                        bitsToProcess = 8 - lastByte;
+                        bitsToProcess = lastByte;
                     }
 
-                    for (int i = 7; i >= 8 - bitsToProcess; i--) {
+                    for (int i = bitsToProcess - 1; i >= 0; i--) {
                         u32 bit = (c >> i) & 1;
                         currentCode = (currentCode << 1) | bit;
                         currentCodeLength++;
-                        fprintf(stdout, "currentCode = ");
-                        printCode2(currentCode, currentCodeLength);
-                        fprintf(stdout, "\n");
+                        // fprintf(stdout, "currentCode = ");
+                        // printCode2(currentCode, currentCodeLength);
+                        // fprintf(stdout, "\n");
 
                         assert(currentCodeLength <= 32);
 
                         // Check if currentCode matches any of the codes
                         for (int n = 0; n < numOfChars; n++) {
                             if (currentCodeLength == codeLengths[n] && currentCode == codes[n]) {
-                                fprintf(stdout, "ch = %c pos = %d\n", chs[n], pos);
+                                // fprintf(stdout, "ch = %c pos = %d\n", chs[n], pos);
                                 decoded[pos++] = chs[n];
+                                assert(pos <= sizeOfDecoded);
                                 currentCode = 0;
                                 currentCodeLength = 0;
                                 break;
@@ -328,9 +328,11 @@ int main(int argc, char ** args)
                             if (file[i] == leaves[j]->ch)
                             {
                                 //pack code into bytes
-                                for (u32 c = 0; c < leaves[j]->codeLength; c++)
+                                u32 code = leaves[j]->code;
+                                u8 codeLength = leaves[j]->codeLength;
+                                for (int c = codeLength - 1; c >= 0; c--)
                                 {
-                                    buffer = (buffer << 1) | ((leaves[j]->code >> c) & 1);
+                                    buffer = (buffer << 1) | ((code >> c) & 1);
                                     bits_in_buffer++;
                                     if (bits_in_buffer == 8)
                                     {
