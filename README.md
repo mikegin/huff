@@ -1,16 +1,28 @@
-huffman encoder/decoder
+# huff
 
-https://codingchallenges.fyi/challenges/challenge-huffman
+## A compression tool using Huffman Coding
 
-
-huff is linux executable
-
-build
+### compile
 ```
-clang++ main.cpp -o huff
+clang++ main.cpp -o huff -O3
 ```
 
-run
+### run
 ```
-./huff <filename>
+./huff -o huff.encoded les-miserable.txt
+
+./huff -o huff.decoded huff.encoded
+```
+
+### verify
+
+that the input was compressed:
+```
+ls -l les-miserable.txt
+ls -l huff.encoded 
+```
+
+uncompressed data is the same as the original:
+```
+diff huff.decoded les-miserable.txt
 ```
