@@ -201,12 +201,12 @@ int main(int argc, char ** args)
 
                     // Handle edge case for last coded byte that may contain padding
                     int bitsToProcess = 8;
-                    if (b == leftOverBytes - 1) {
+                    if (b == leftOverBytes - 1 && lastByte > 0) { // lastByte == 0 when bits pack perfectly into bytes
                         bitsToProcess = lastByte;
                     }
 
-                    for (int i = bitsToProcess - 1; i >= 0; i--) {
-                        u32 bit = (c >> i) & 1;
+                    for (int i = 0; i < bitsToProcess; i++) {
+                        u32 bit = (c >> (7 - i)) & 1;
                         currentCode = (currentCode << 1) | bit;
                         currentCodeLength++;
                         // fprintf(stdout, "currentCode = ");
@@ -237,7 +237,8 @@ int main(int argc, char ** args)
             {
 
                 fseek(fp, -1, SEEK_END);
-                long fileSize = ftell(fp);
+                long fileIndex = ftell(fp);
+                long fileSize = fileIndex + 1;
                 fseek(fp, 0, SEEK_SET);
 
                 char * file = (char *)malloc(fileSize + 1);
@@ -350,8 +351,8 @@ int main(int argc, char ** args)
                         buffer <<= (8 - bits_in_buffer); // Shift to left since will be reading bits from left to right
                         fwrite(&buffer, 1, 1, outputFile);
                         // Write the number of valid bits in the last byte
-                        fwrite(&bits_in_buffer, 1, 1, outputFile);
                     }
+                    fwrite(&bits_in_buffer, 1, 1, outputFile); // also write out 0 for the last byte if bits fit perfectly into bytes
 
                 }
                 else
